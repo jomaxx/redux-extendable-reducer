@@ -1,2 +1,2 @@
 # redux-injectable-reducer
-Redux store reducer that allows parts of the state tree to be injected lazily. Useful for large single page applications that utilize bundle splitting.
+Redux store reducer capable of lazily injecting parts of the state tree. Useful for large single page applications that utilize bundle splitting.
