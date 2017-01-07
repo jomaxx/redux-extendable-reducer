@@ -1,6 +1,6 @@
 {
   "name": "redux-injectable-reducer",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "main": "lib.js",
   "scripts": {
     "build": "babel src.js > lib.js",
