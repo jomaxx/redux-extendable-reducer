@@ -1,31 +1,69 @@
-const INJECT = '@@rootReducer/INJECT';
+import { createStore } from 'redux';
 
-export const inject = (reducers = {}) => ({
-  type: INJECT,
-  payload: reducers,
-});
+const BUFFER = '@@rootReducer/BUFFER';
 
-const reducersReducer = (reducers = {}, action) => {
-  if (action.type === INJECT) {
-    return Object.keys(action.payload).reduce((prevReducers, key) => {
-      if (prevReducers[key] === action.payload[key]) return prevReducers;
-      if (typeof prevReducers[key] !== 'undefined') throw new Error(`cannot replace ${key} reducer`);
-      return { ...prevReducers, [key]: action.payload[key] };
-    }, reducers);
+const bufferReducer = (state = {}, action) => {
+  if (action.type === BUFFER) {
+    return action.payload.reduce((prev, key) => {
+      if (prev[key]) return prev;
+      return { ...prev, [key]: [] };
+    }, state);
   }
 
-  return reducers;
+  return Object.keys(state).reduce((prev, key) => ({
+    ...prev,
+    [key]: [ ...prev[key], action ],
+  }), state);
 };
 
-export const rootReducer = (state = {}, action) => {
-  const reducers = reducersReducer(state.__reducers, action);
+const createRootReducer = (reducers = {}) => (state = {}, action) => {
+  const buffer = bufferReducer(state.__buffer, action);
 
-  const nextState = Object.keys(reducers).reduce((prevState, key) => ({
-    ...prevState,
-    [key]: reducers[key](prevState[key], action),
+  const nextState = Object.keys(reducers).reduce((prev, key) => ({
+    ...prev,
+    [key]: buffer[key].splice(0).reduce(reducers[key], prev[key]),
   }), state);
 
-  nextState.__reducers = reducers;
+  return {
+    ...nextState,
+    __buffer: buffer,
+  };
+};
 
-  return nextState;
+export const configureStore = (...args) => {
+  let reducers = {};
+
+  const store = createStore(createRootReducer(reducers), ...args);
+
+  const replaceReducer = () => {
+    throw new Error('cannot replace root reducer');
+  };
+
+  const inject = (injectedReducers) => {
+    const keys = Object.keys(injectedReducers);
+
+    const nextReducers = keys.reduce((prev, key) => {
+      const reducer = injectedReducers[key];
+      if (typeof reducer !== 'function') throw new Error(`'${key}' is not a function`);
+      if (prev[key] === reducer) return prev;
+      if (prev[key]) throw new Error(`cannot replace ${key} reducer`);
+      return { ...prev, [key]: reducer };
+    }, reducers);
+
+    store.dispatch({
+      type: BUFFER,
+      payload: keys,
+    });
+
+    if (nextReducers !== reducers) {
+      reducers = nextReducers;
+      store.replaceReducer(createRootReducer(reducers));
+    }
+  };
+
+  return {
+    ...store,
+    replaceReducer,
+    inject,
+  };
 };

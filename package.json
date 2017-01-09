@@ -16,7 +16,10 @@
     "jest": "^18.1.0",
     "redux": "^3.6.0"
   },
-  "description": "Redux store reducer capable of lazily injecting parts of the state tree. Useful for large single page applications that utilize bundle splitting.",
+  "peerDependencies": {
+    "redux": "*"
+  },
+  "description": "Redux store capable of lazily injecting parts of the state tree. Useful for large single page applications that utilize bundle splitting.",
   "files": [
     "lib.js"
   ],

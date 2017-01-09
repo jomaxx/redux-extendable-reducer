@@ -1,41 +1,41 @@
-import { createStore } from 'redux';
-import { rootReducer, inject } from '../src';
+import { configureStore } from '../src';
 
-const __reducers = {
-  done: (state, action) => state || action.type === 'DONE',
-};
+const doneReducer = (state, action) => state || action.type === 'DONE';
 
-it('should have no injected reducers by default', () => {
-  const { dispatch, getState } = createStore(rootReducer);
-  expect(getState()).toEqual({ __reducers: {} });
+it('should inject reducer', () => {
+  const store = configureStore();
+  store.dispatch({ type: 'DONE' });
+  expect(store.getState().done).toEqual(undefined);
+  store.inject({ done: doneReducer });
+  expect(store.getState().done).toEqual(false);
+  store.dispatch({ type: 'DONE' });
+  expect(store.getState().done).toEqual(true);
 });
 
-it('should hydrate with initial injected reducers', () => {
-  const { dispatch, getState } = createStore(rootReducer, { __reducers });
-  expect(getState()).toEqual({ done: false, __reducers });
-  dispatch({ type: 'DONE' });
-  expect(getState()).toEqual({ done: true, __reducers });
+it('should buffer actions then flush once reducer is injected', () => {
+  const serverStore = configureStore();
+  serverStore.inject({ done: doneReducer });
+  const initialState = JSON.parse(JSON.stringify(serverStore.getState()));
+  const clientStore = configureStore(initialState);
+  clientStore.dispatch({ type: 'DONE' });
+  expect(clientStore.getState().done).toEqual(false);
+  clientStore.inject({ done: doneReducer });
+  expect(clientStore.getState().done).toEqual(true);
 });
 
-it('should inject reducers', () => {
-  const { dispatch, getState } = createStore(rootReducer);
-  dispatch(inject(__reducers));
-  expect(getState()).toEqual({ done: false, __reducers });
-  dispatch({ type: 'DONE' });
-  expect(getState()).toEqual({ done: true, __reducers });
+it('should throw error when reducer is not a function', () => {
+  const store = configureStore();
+  expect(() => store.inject({ done: true })).toThrowError();
 });
 
-it('should throw error if attempt to replace injected reducer', () => {
-  const { dispatch, getState } = createStore(rootReducer);
-  dispatch(inject(__reducers));
-  expect(() => dispatch(inject({ done: () => {} }))).toThrowError();
+it('should throw error when attempting to replace reducer', () => {
+  const store = configureStore();
+  store.inject({ done: doneReducer });
+  expect(() => store.inject({ done: doneReducer })).not.toThrowError();
+  expect(() => store.inject({ done() {} })).toThrowError();
 });
 
-// common way of hydrating from server is to JSON.stringify then JSON.parse
-it('should remove injected reducers when put through JSON.stringify', () => {
-  const { dispatch, getState } = createStore(rootReducer, { __reducers });
-  dispatch({ type: 'DONE' });
-  const stringified = JSON.stringify(getState());
-  const parsed = JSON.parse(stringified);
-  expect(parsed).toEqual({ done: true, __reducers: {} });
+it('should throw error when attempting to replace root reducer', () => {
+  const store = configureStore();
+  expect(() => store.replaceReducer(() => {})).toThrowError();
 });
