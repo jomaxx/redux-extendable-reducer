@@ -19,7 +19,7 @@ const bufferReducer = (state = {}, action) => {
 const createRootReducer = (reducers = {}) => (state = {}, action) => {
   const buffer = bufferReducer(state.__buffer, action);
 
-  const nextState = Object.keys(reducers).reduce((prev, key) => (!buffer[key] ? undefined : {
+  const nextState = Object.keys(reducers).reduce((prev, key) => (!buffer[key] ? prev : {
     ...prev,
     [key]: buffer[key].splice(0).reduce(reducers[key], prev[key]),
   }), state);
