@@ -3,17 +3,19 @@ import { createStore } from 'redux';
 const BUFFER = '@@rootReducer/BUFFER';
 
 const bufferReducer = (state = {}, action) => {
+  let nextState = state;
+
   if (action.type === BUFFER) {
-    return action.payload.reduce((prev, key) => {
+    nextState = action.payload.reduce((prev, key) => {
       if (prev[key]) return prev;
       return { ...prev, [key]: [] };
-    }, state);
+    }, nextState);
   }
 
-  return Object.keys(state).reduce((prev, key) => ({
+  return Object.keys(nextState).reduce((prev, key) => ({
     ...prev,
     [key]: [ ...prev[key], action ],
-  }), state);
+  }), nextState);
 };
 
 const createRootReducer = (reducers = {}) => (state = {}, action) => {
