@@ -39,3 +39,33 @@ it('should throw error when attempting to replace root reducer', () => {
   const store = configureStore();
   expect(() => store.replaceReducer(() => {})).toThrowError();
 });
+
+it('should handle replaying of actions during timetravel', () => {
+  const store = configureStore(undefined, (createStore) => (...args) => {
+    const { replaceReducer, dispatch, ...rest } = createStore(...args);
+    const actions = [];
+
+    return {
+      dispatch: (action) => {
+        actions.push(action);
+        return dispatch(action);
+      },
+
+      replaceReducer: (nextReducer) => {
+        replaceReducer(state => undefined); // reset state
+        replaceReducer(nextReducer);
+        actions.forEach(dispatch); // replay actions
+      },
+
+      ...rest,
+    };
+  });
+
+  store.dispatch({ type: 'DONE' });
+  expect(store.getState().done).toEqual(undefined);
+  store.inject({ done: doneReducer });
+  expect(store.getState().done).toEqual(false);
+  store.dispatch({ type: 'DONE' });
+  store.inject({ done: doneReducer, test: () => true });
+  expect(store.getState().done).toEqual(true);
+});
