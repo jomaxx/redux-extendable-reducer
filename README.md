@@ -83,7 +83,7 @@ class App extends Component {
 
 const ConnectedApp = connect(
   state => ({ count: state.count }),
-  { extendReducer }
+  { extendReducer, incrementCount }
 )(App);
 
 const store = createStore(rootReducer);
