@@ -95,7 +95,3 @@ ReactDOM.render(
   document.getElementById('root')
 );
 ```
-
-## Action Buffering
-
-When the root reducer is extended, a buffer is created for each namespace that is introduced. This marks a place in the history for the root reducer to start buffering actions for a given namespace. This is useful for server side rendering where your client store would be created with initial state from the server store. Since the root reducer is extended lazily, you would want actions to be put into a buffer for each namespace that was introduced to the server store. Once the root reducer is extended in the client store, the buffer for each namespace is flushed and handled by the respective namespace reducer.
