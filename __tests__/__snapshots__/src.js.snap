@@ -1,0 +1,59 @@
+exports[`test buffers actions until reducer is extended 1`] = `
+Array [
+  Object {
+    "meta": Object {
+      "keys": Array [
+        "done",
+      ],
+    },
+    "payload": Object {},
+    "type": "@@redux-extendable-reducer/EXTEND_REDUCER",
+  },
+  Object {
+    "type": "@@redux/INIT",
+  },
+  Object {
+    "type": "DONE",
+  },
+  Object {
+    "meta": Object {
+      "keys": Array [
+        "done",
+      ],
+    },
+    "payload": Object {
+      "done": [Function],
+    },
+    "type": "@@redux-extendable-reducer/EXTEND_REDUCER",
+  },
+]
+`;
+
+exports[`test extends reducer 1`] = `
+Array [
+  Object {
+    "meta": Object {
+      "keys": Array [
+        "done",
+      ],
+    },
+    "payload": Object {
+      "done": [Function],
+    },
+    "type": "@@redux-extendable-reducer/EXTEND_REDUCER",
+  },
+  Object {
+    "type": "DONE",
+  },
+]
+`;
+
+exports[`test throws error when reducer is not a function 1`] = `"reducers.done is not a function"`;
+
+exports[`test warns when attempting to replace reducer 1`] = `
+Array [
+  Array [
+    "attempt to replace reducers.done was ignored.",
+  ],
+]
+`;

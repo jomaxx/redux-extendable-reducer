@@ -1,71 +1,49 @@
-import { configureStore } from '../src';
+import { createStore } from 'redux';
+import rootReducer, { extendReducer } from '../src';
 
-const doneReducer = (state, action) => state || action.type === 'DONE';
+const done = (state = [], action) => state.concat(action);
+const doneAction = { type: 'DONE' };
 
-it('should inject reducer', () => {
-  const store = configureStore();
-  store.dispatch({ type: 'DONE' });
-  expect(store.getState().done).toEqual(undefined);
-  store.inject({ done: doneReducer });
-  expect(store.getState().done).toEqual(false);
-  store.dispatch({ type: 'DONE' });
-  expect(store.getState().done).toEqual(true);
+const consoleWarn = console.warn;
+
+beforeAll(() => {
+  console.warn = jest.fn(consoleWarn);
 });
 
-it('should buffer actions then flush once reducer is injected', () => {
-  const serverStore = configureStore();
-  serverStore.inject({ done: doneReducer });
+beforeEach(() => {
+  jest.resetAllMocks();
+});
+
+afterAll(() => {
+  console.warn = consoleWarn;
+});
+
+it('extends reducer', () => {
+  const store = createStore(rootReducer);
+  store.dispatch(extendReducer({ done }));
+  store.dispatch(doneAction);
+  expect(store.getState().done).toMatchSnapshot();
+});
+
+it('buffers actions until reducer is extended', () => {
+  const serverStore = createStore(rootReducer);
+  serverStore.dispatch(extendReducer({ done }));
   const initialState = JSON.parse(JSON.stringify(serverStore.getState()));
-  const clientStore = configureStore(initialState);
-  clientStore.dispatch({ type: 'DONE' });
-  expect(clientStore.getState().done).toEqual(false);
-  clientStore.inject({ done: doneReducer });
-  expect(clientStore.getState().done).toEqual(true);
+  const clientStore = createStore(rootReducer, initialState);
+  clientStore.dispatch(doneAction);
+  clientStore.dispatch(extendReducer({ done }));
+  expect(clientStore.getState().done).toMatchSnapshot();
 });
 
-it('should throw error when reducer is not a function', () => {
-  const store = configureStore();
-  expect(() => store.inject({ done: true })).toThrowError();
+it('throws error when reducer is not a function', () => {
+  const store = createStore(rootReducer);
+  expect(() => store.dispatch(extendReducer({ done: true }))).toThrowErrorMatchingSnapshot();
 });
 
-it('should throw error when attempting to replace reducer', () => {
-  const store = configureStore();
-  store.inject({ done: doneReducer });
-  expect(() => store.inject({ done: doneReducer })).not.toThrowError();
-  expect(() => store.inject({ done() {} })).toThrowError();
-});
-
-it('should throw error when attempting to replace root reducer', () => {
-  const store = configureStore();
-  expect(() => store.replaceReducer(() => {})).toThrowError();
-});
-
-it('should handle replaying of actions during timetravel', () => {
-  const store = configureStore(undefined, (createStore) => (...args) => {
-    const { replaceReducer, dispatch, ...rest } = createStore(...args);
-    const actions = [];
-
-    return {
-      dispatch: (action) => {
-        actions.push(action);
-        return dispatch(action);
-      },
-
-      replaceReducer: (nextReducer) => {
-        replaceReducer(state => undefined); // reset state
-        replaceReducer(nextReducer);
-        actions.forEach(dispatch); // replay actions
-      },
-
-      ...rest,
-    };
-  });
-
-  store.dispatch({ type: 'DONE' });
-  expect(store.getState().done).toEqual(undefined);
-  store.inject({ done: doneReducer });
-  expect(store.getState().done).toEqual(false);
-  store.dispatch({ type: 'DONE' });
-  store.inject({ done: doneReducer, test: () => true });
-  expect(store.getState().done).toEqual(true);
+it('warns when attempting to replace reducer', () => {
+  console.warn.mockImplementationOnce(() => {});
+  const store = createStore(rootReducer);
+  store.dispatch(extendReducer({ done }));
+  store.dispatch(extendReducer({ done() {} }));
+  expect(console.warn.mock.calls).toMatchSnapshot();
 });

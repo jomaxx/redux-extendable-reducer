@@ -1,37 +1,39 @@
-# redux-injectable-reducer
-Redux store capable of lazily injecting parts of the state tree. Useful for large single page applications that utilize bundle splitting.
+# redux-extendable-reducer
 
-## Inspiration
+Redux reducer capable of lazily extending itself. Useful for large single page applications that utilize bundle splitting.
 
-This library is influenced by [redux-injectable-store](https://github.com/lelandrichardson/redux-injectable-store). Please take a look there before relying on this library. Currently, the main difference between the two libraries is [Action Buffering](#action-buffering).
+*NOTE: formally redux-injectable-reducer*
 
 ## Install
 
 ```
-npm install --save redux redux-injectable-reducer
+npm install --save redux redux-extendable-reducer
 ```
 
 ## Usage
 
 ```js
-import { configureStore } from 'redux-injectable-reducer';
-
-const store = configureStore();
-
-store.dispatch({ type: 'INCREMENT' });
-
-console.log(store.getState().count); // undefined
+import { createStore } from 'redux';
+import rootReducer, { extendReducer } from 'redux-extendable-reducer';
 
 const countReducer = (state = 0, action) => {
-  if (action.type === 'INCREMENT') return state + 1;
+  if (action.type === 'INCREMENT_COUNT') return state + 1;
   return state;
 };
 
-store.inject({ count: countReducer });
+const incrementCount = () => ({ type: 'INCREMENT_COUNT' });
+
+const store = createStore(rootReducer);
+
+store.dispatch(incrementCount());
+
+console.log(store.getState().count); // undefined
+
+store.dispatch(extendReducer({ count: countReducer }));
 
 console.log(store.getState().count); // 0
 
-store.dispatch({ type: 'INCREMENT' });
+store.dispatch(incrementCount());
 
 console.log(store.getState().count); // 1
 ```
@@ -41,60 +43,59 @@ console.log(store.getState().count); // 1
 ```js
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
-import { configureStore } from 'redux-injectable-reducer';
-
-const store = configureStore();
+import PropTypes from 'prop-types';
+import { Provider, connect } from 'react-redux';
+import { createStore } from 'redux';
+import rootReducer, { extendReducer } from 'redux-extendable-reducer';
 
 const countReducer = (state = 0, action) => {
-  if (action.type === 'INCREMENT') return state + 1;
+  if (action.type === 'INCREMENT_COUNT') return state + 1;
   return state;
 };
 
+const incrementCount = () => ({ type: 'INCREMENT_COUNT' });
+
 class App extends Component {
-  store = this.props.store;
+  static propTypes = {
+    count: PropTypes.number,
+    extendReducer: PropTypes.func.isRequired,
+    incrementCount: PropTypes.func.isRequired,
+  };
 
   componentWillMount() {
-    this.store.inject({ count: countReducer });
+    this.props.extendReducer({ count: countReducer });
   }
 
   componentDidMount() {
-    this.unsubscribe = this.store.subscribe(() => {
-      this.forceUpdate();
-    });
-
     this.interval = setInterval(() => {
-      this.store.dispatch({ type: 'INCREMENT' });
+      this.props.incrementCount();
     }, 1000);
   }
 
   componentWillUnmount() {
-    this.unsubscribe();
     clearInterval(this.interval);
   }
 
   render() {
-    const { count } = this.store.getState();
-    return <span>{count}</span>;
+    return <span>{this.props.count}</span>;
   }
 }
 
+const ConnectedApp = connect(
+  state => ({ count: state.count }),
+  { extendReducer }
+)(App);
+
+const store = createStore(rootReducer);
+
 ReactDOM.render(
-  <App store={store} />,
+  <Provider store={store}>
+    <ConnectedApp />
+  </Provider>,
   document.getElementById('root')
 );
 ```
 
 ## Action Buffering
 
-When injecting reducers, a `BUFFER` action is dispatched to the store. This marks a place in the history for the root reducer to start buffering events for injected reducers to handle. This is useful for server side rendering where your client store would be created with initial state from the server store. Since reducers are injected lazily, you would want actions to be put into a buffer for reducers that were injected to the server store. Once the reducer is injected to the client store, the buffer is flushed and handled by the respective reducer.
-
-
-## API
-
-### configureStore([preloadedState], [enhancer]) => store
-
-`configureStore` is a wrapper around `createStore` from `redux`. `preloadedState` and `enhancer` act the same as the `createStore` api. See the [redux docs](https://github.com/reactjs/redux/blob/master/docs/api/createStore.md) for more information on `createStore`.
-
-### store#inject(reducers)
-
-The `store` object is the same as the object returned from `createStore` with the addition of the `store#inject` method. This method allows you to extend the state tree by injecting reducers to handle different namespaces on the root state. See the [redux docs](https://github.com/reactjs/redux/blob/master/docs/api/Store.md) for more information on stores.
+When the root reducer is extended, a buffer is created for each namespace that is introduced. This marks a place in the history for the root reducer to start buffering actions for a given namespace. This is useful for server side rendering where your client store would be created with initial state from the server store. Since the root reducer is extended lazily, you would want actions to be put into a buffer for each namespace that was introduced to the server store. Once the root reducer is extended in the client store, the buffer for each namespace is flushed and handled by the respective namespace reducer.

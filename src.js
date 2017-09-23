@@ -1,71 +1,67 @@
-import { createStore } from 'redux';
+'use strict';
 
-const BUFFER = '@@rootReducer/BUFFER';
+const EXTEND_REDUCER = '@@redux-extendable-reducer/EXTEND_REDUCER';
 
-const bufferReducer = (state = {}, action) => {
-  let nextState = state;
+export function extendReducer(reducers) {
+  return {
+    type: EXTEND_REDUCER,
+    payload: reducers,
+    meta: { keys: Object.keys(reducers) },
+  };
+}
 
-  if (action.type === BUFFER) {
-    nextState = action.payload.reduce((prev, key) => {
-      if (prev[key]) return prev;
-      return { ...prev, [key]: [] };
-    }, nextState);
+function reducersReducer(state = {}, action) {
+  if (action.type === EXTEND_REDUCER) {
+    const nextState = Object.assign({}, state);
+
+    for (let key in action.payload) {
+      if (action.payload.hasOwnProperty(key)) {
+        if (nextState[key] && nextState[key] !== action.payload[key]) {
+          console.warn(`attempt to replace reducers.${key} was ignored.`);
+        } else if (typeof action.payload[key] === 'function') {
+          nextState[key] = action.payload[key];
+        } else {
+          throw new Error(`reducers.${key} is not a function`);
+        }
+      }
+    }
+
+    return nextState;
   }
 
-  return Object.keys(nextState).reduce((prev, key) => ({
-    ...prev,
-    [key]: [ ...prev[key], action ],
-  }), nextState);
-};
+  return state;
+}
 
-const createRootReducer = (reducers = {}) => (state = {}, action) => {
-  const buffer = bufferReducer(state.__buffer, action);
+function buffersReducer(state = {}, action) {
+  const nextState = Object.assign({}, state);
 
-  const nextState = Object.keys(reducers).reduce((prev, key) => (!buffer[key] ? prev : {
-    ...prev,
-    [key]: buffer[key].splice(0).reduce(reducers[key], prev[key]),
-  }), state);
-
-  return {
-    ...nextState,
-    __buffer: buffer,
-  };
-};
-
-export const configureStore = (...args) => {
-  let reducers = {};
-
-  const store = createStore(createRootReducer(reducers), ...args);
-
-  const replaceReducer = () => {
-    throw new Error('cannot replace root reducer');
-  };
-
-  const inject = (injectedReducers) => {
-    const keys = Object.keys(injectedReducers);
-
-    const nextReducers = keys.reduce((prev, key) => {
-      const reducer = injectedReducers[key];
-      if (typeof reducer !== 'function') throw new Error(`'${key}' is not a function`);
-      if (prev[key] === reducer) return prev;
-      if (prev[key]) throw new Error(`cannot replace ${key} reducer`);
-      return { ...prev, [key]: reducer };
-    }, reducers);
-
-    store.dispatch({
-      type: BUFFER,
-      payload: keys,
+  if (action.type === EXTEND_REDUCER) {
+    action.meta.keys.forEach(key => {
+      nextState[key] = nextState[key] || [];
     });
+  }
 
-    if (nextReducers !== reducers) {
-      reducers = nextReducers;
-      store.replaceReducer(createRootReducer(reducers));
+  for (let key in nextState) {
+    if (nextState.hasOwnProperty(key)) {
+      nextState[key] = nextState[key].concat(action);
     }
-  };
+  }
 
-  return {
-    ...store,
-    replaceReducer,
-    inject,
-  };
-};
+  return nextState;
+}
+
+export default function extendableReducer(state, action) {
+  const nextState = Object.assign({}, state);
+  const reducers = nextState.__reducers = reducersReducer(nextState.__reducers, action);
+  const buffers = nextState.__buffers = buffersReducer(nextState.__buffers, action);
+
+  // flush buffers
+  for (let key in buffers) {
+    if (buffers.hasOwnProperty(key) && reducers.hasOwnProperty(key)) {
+      nextState[key] = buffers[key].reduce(reducers[key], nextState[key]);
+      buffers[key].splice(0);
+    }
+  }
+
+  return nextState;
+}
